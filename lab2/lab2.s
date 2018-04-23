@@ -17,12 +17,13 @@ input_file2: .ascii "input2.txt\0"
 output_file: .ascii "output.txt\0"
 
 .bss
-.comm input_buffer1, 1024
-.comm input_buffer2, 1024
-.comm four_bytes, 1024
-.comm little_endian1, 1024
-.comm little_endian2, 1024
-.comm result_buffer, 1024
+.comm input_buffer1, BUFLEN
+.comm input_buffer2, BUFLEN
+.comm four_bytes, BUFLEN
+.comm little_endian1, BUFLEN
+.comm little_endian2, BUFLEN
+.comm result_buffer, BUFLEN
+.comm hexa_buffer, BUFLEN
 
 .text
 .global main
@@ -42,7 +43,7 @@ movq %rax, %r11		# zapisanie identyfikatora pliku
 movq $SYSREAD, %rax
 movq %r11, %rdi
 movq $input_buffer1, %rsi
-movq $1024, %rdx
+movq $BUFLEN, %rdx
 syscall
 
 dec %rax
@@ -68,7 +69,7 @@ movq %rax, %r12     # zapisanie identyfikatora pliku
 movq $SYSREAD, %rax
 movq %r12, %rdi
 movq $input_buffer2, %rsi
-movq $1024, %rdx
+movq $BUFLEN, %rdx
 syscall
 
 dec %rax
@@ -166,8 +167,40 @@ adc %al, %bl
 pushfq
 movb %bl, result_buffer(, %rdi, 1)
 inc %rdi
-cmp $1024, %rdi
+cmp $BUFLEN, %rdi
 jle add_two_numbers
+
+movq $0, %r8
+movq $0, %r9
+
+hexa:
+movb result_buffer(, %r8, 1), %al
+movb %al, %bl
+movb %al, %cl
+shr $4, %cl
+and $0b1111, %bl
+and $0b1111, %cl
+add $'0', %bl
+add $'0', %cl
+
+cmp $'9', %bl
+jle continue
+add $7, %bl
+
+continue:
+cmp $'9', %cl
+jle continue2
+add $7, %cl
+
+continue2:
+movb %bl, hexa_buffer(, %r9, 1)
+inc %r9
+movb %cl, hexa_buffer(, %r9, 1)
+inc %r9
+
+inc %r8
+cmp $256, %r8
+jle hexa
 
 save_output_file:
 movq $SYSOPEN, %rax
@@ -179,14 +212,20 @@ syscall
 movq %rax, %r10
 movq $SYSWRITE, %rax
 movq %r10, %rdi
-movq $result_buffer, %rsi
-movq $1024, %rdx
+movq $hexa_buffer, %rsi
+movq $BUFLEN, %rdx
 syscall
 
 movq $SYSCLOSE, %rax
 movq %r10,  %rdi
 movq $0, %rsi
 movq $0, %rdx
+syscall
+
+movq $SYSWRITE, %rax
+movq $STDOUT, %rdi
+movq $hexa_buffer, %rsi
+movq $BUFLEN, %rdx
 syscall
 
 program_exit:
